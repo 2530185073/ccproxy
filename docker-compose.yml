@@ -1,0 +1,91 @@
+# ClaudeCodeProxy 部署：应用 + PostgreSQL + Redis
+#
+# 使用：
+#   1. 把本文件和 .env.example 放到同一目录，复制 .env.example 为 .env 并修改密码
+#   2. docker compose up -d
+#   3. 打开 http://<服务器IP>:<APP_PORT>/<ADMIN_PATH>/
+#
+# 升级：改 .env 里的 CC2API_VERSION，然后 docker compose pull && docker compose up -d
+
+name: claude-code-proxy
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  app:
+    image: ghcr.io/2530185073/ccproxy:${CC2API_VERSION:-latest}
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    ports:
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-5674}:5674"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "5674"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请在 .env 中设置 ADMIN_PASSWORD}
+      ADMIN_PATH: ${ADMIN_PATH:?请在 .env 中设置 ADMIN_PATH}
+      DATABASE_DRIVER: postgres
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_USER: ${POSTGRES_USER:-ccproxy}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+      DATABASE_DBNAME: ${POSTGRES_DB:-claude_code_gateway}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?请在 .env 中设置 REDIS_PASSWORD}
+      REDIS_DB: "0"
+      REQUEST_LOG_MAX_ROWS: ${REQUEST_LOG_MAX_ROWS:-20000}
+      SYNTHETIC_LOG_MAX_ROWS: ${SYNTHETIC_LOG_MAX_ROWS:-20000}
+      USAGE_RECOVERY_ENABLED: ${USAGE_RECOVERY_ENABLED:-1}
+    volumes:
+      - app_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      POSTGRES_USER: ${POSTGRES_USER:-ccproxy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-claude_code_gateway}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    logging: *default-logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?请在 .env 中设置 REDIS_PASSWORD}
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\""]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *default-logging
+
+volumes:
+  app_data:
+  postgres_data:
+  redis_data:
