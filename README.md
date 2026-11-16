@@ -2,7 +2,7 @@
 
 一个镜像 + PostgreSQL + Redis，用 Docker Compose 一键启动。全程大约 10 分钟。
 
-- 镜像：`ghcr.io/2530185073/ccproxy`（公开，无需登录即可拉取）
+- 镜像：`ghcr.io/2530185073/ccproxy:1.8.32`（公开，无需登录即可拉取）
 - 部署文件：本仓库的 `docker-compose.yml` 和 `.env.example`
 
 ---
@@ -86,7 +86,7 @@ openssl rand -hex 6
 
 | 配置项 | 默认值 | 说明 |
 |---|---|---|
-| `CC2API_VERSION` | `latest` | 镜像版本。想锁定版本就填具体版本号，如 `1.8.12-f276bc0` |
+| `CC2API_VERSION` | `1.8.32` | 镜像版本。升级时改成新的版本号，不要用 `latest` |
 | `APP_BIND` | `0.0.0.0` | 监听地址。配了 HTTPS 反向代理后改成 `127.0.0.1`（见第七步） |
 | `APP_PORT` | `5674` | 对外端口 |
 | `TZ` | `Asia/Shanghai` | 时区，影响日志和统计的时间显示 |
@@ -249,7 +249,7 @@ curl https://api.example.com/v1/messages \
 
 ```bash
 cd /opt/ccproxy
-# 想锁定某个版本时，先把 .env 里的 CC2API_VERSION 改成新版本号；用 latest 跳过这步
+# 先把 .env 里的 CC2API_VERSION 改成新版本号
 docker compose pull
 docker compose up -d
 docker image prune -f      # 清理旧镜像，可选
